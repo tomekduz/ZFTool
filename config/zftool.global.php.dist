@@ -5,8 +5,8 @@ return array(
     'router' => array(
         'routes' => array(
             'zftool-diagnostics' => array(
-                 'type' => 'Zend\Mvc\Router\Http\Segment',
-                 'options' => array(
+                'type' => 'Zend\Mvc\Router\Http\Segment',
+                'options' => array(
                     'route' => '/diagnostics[/:filter[/:label]]',
                     'defaults' => array(
                         'controller' => 'ZFTool\Controller\Diagnostics',
