@@ -51,6 +51,7 @@ class DiagnosticsController extends AbstractActionController
         $quiet          = !$verbose && !$debug && $this->params()->fromRoute('quiet', false);
         $breakOnFailure = $this->params()->fromRoute('break', false);
         $checkGroupName = $this->params()->fromRoute('filter', false);
+        $checkLabelName     = $this->params()->fromRoute('label', false);
 
         // Get basic diag configuration
         $config = isset($config['diagnostics']) ? $config['diagnostics'] : array();
@@ -77,31 +78,29 @@ class DiagnosticsController extends AbstractActionController
             $config = array_intersect_ukey($config, array($checkGroupName => 1), 'strcasecmp');
 
             if (empty($config)) {
-                $m = new ConsoleModel();
-                $m->setResult($console->colorize(sprintf(
+                throw new RuntimeException(sprintf(
                     "Unable to find a group of diagnostic checks called \"%s\". Try to use module name (i.e. \"%s\").\n",
                     $checkGroupName,
                     'Application'
-                ), ColorInterface::YELLOW));
-                $m->setErrorLevel(1);
-
-                return $m;
+                ));
             }
+
+            if ($checkLabelName) {
+                $config[$checkGroupName] = array_diff_ukey($config[$checkGroupName], array($checkLabelName => 1), 'strcasecmp');
+            }
+
         }
 
         // Check if there are any diagnostic checks defined
         if (empty($config)) {
-            $m = new ConsoleModel();
-            $m->setResult(
-                $console->colorize(
+            if (empty($config)) {
+                throw new RuntimeException(
                     "There are no diagnostic checks currently enabled for this application - please add one or more " .
                     "entries into config \"diagnostics\" array or add getDiagnostics() method to your Module class. " .
                     "\n\nMore info: https://github.com/zendframework/ZFTool/blob/master/docs/" .
-                    "DIAGNOSTICS.md#adding-checks-to-your-module\n", ColorInterface::YELLOW)
-            );
-            $m->setErrorLevel(1);
-
-            return $m;
+                    "DIAGNOSTICS.md#adding-checks-to-your-module\n"
+                );
+            }
         }
 
         // Analyze check definitions and construct check instances
@@ -137,6 +136,12 @@ class DiagnosticsController extends AbstractActionController
                     if ($checkLabel && is_callable(array($check, 'setLabel'))) {
                         $check->setLabel($checkGroupName . ': ' . $checkLabel);
                     }
+
+
+                    if ($checkLabelName && $check->getLabel() !== $checkLabelName) {
+                        continue;
+                    }
+
                     $checkCollection[] = $check;
                     continue;
                 }
@@ -206,6 +211,10 @@ class DiagnosticsController extends AbstractActionController
                 // Use duck-typing for determining if the check allows for setting custom label
                 if ($checkLabel && is_callable(array($check, 'setLabel'))) {
                     $check->setLabel($checkGroupName . ': ' . $checkLabel);
+                }
+
+                if ($checkLabelName && $check->getLabel() !== $checkLabelName) {
+                    continue;
                 }
 
                 $checkCollection[] = $check;
