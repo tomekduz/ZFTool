@@ -123,9 +123,9 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
 
     public function testNoChecks()
     {
+        $this->setExpectedException('\RuntimeException');
+
         $result = $this->controller->dispatch(new ConsoleRequest());
-        $this->assertInstanceOf('Zend\View\Model\ViewModel', $result);
-        $this->assertEquals(1, $result->getErrorLevel());
     }
 
     /**
@@ -247,7 +247,7 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
 
     /**
      *  'diagnostics' => array(
-     *      'group' => array(
+     *      'group' => array(DiagnosticsControllerTest
      *          'check label' => 'someFunctionName'
      *      )
      *  )
@@ -561,7 +561,7 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
         $this->fail('Definition is invalid!');
     }
 
-    public function testFiltering()
+    public function testFilteringByGroup()
     {
         $this->config['diagnostics']['group1']['test11'] = $check11 = new AlwaysSuccessCheck();
         $this->config['diagnostics']['group2']['test21'] = $check21 = new AlwaysSuccessCheck();
@@ -578,6 +578,28 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($check21, $check = array_shift($checks));
         $this->assertEquals('group2: test21', $check->getLabel());
         $this->assertInstanceOf('ZendDiagnostics\Result\Success', $results[$check]);
+        $this->assertSame($check22, $check = array_shift($checks));
+        $this->assertEquals('group2: test22', $check->getLabel());
+        $this->assertInstanceOf('ZendDiagnostics\Result\Success', $results[$check]);
+    }
+
+    public function testFilteringByLabel()
+    {
+        $this->config['diagnostics']['group1']['test11'] = $check11 = new AlwaysSuccessCheck();
+        $this->config['diagnostics']['group2']['test21'] = $check21 = new AlwaysSuccessCheck();
+        $this->config['diagnostics']['group2']['test22'] = $check22 = new AlwaysSuccessCheck();
+
+        $this->routeMatch->setParam('filter', 'group2');
+        $this->routeMatch->setParam('label', 'group2: test22');
+
+        $result = $this->controller->dispatch(new ConsoleRequest());
+
+        $this->assertInstanceOf('Zend\View\Model\ViewModel', $result);
+        $this->assertInstanceOf('ZendDiagnostics\Result\Collection', $result->getVariable('results'));
+
+        $results = $result->getVariable('results');
+        $this->assertEquals(1, $results->count());
+        $checks = ArrayUtils::iteratorToArray(($results));
         $this->assertSame($check22, $check = array_shift($checks));
         $this->assertEquals('group2: test22', $check->getLabel());
         $this->assertInstanceOf('ZendDiagnostics\Result\Success', $results[$check]);
@@ -605,15 +627,32 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
         $this->assertInstanceOf('ZendDiagnostics\Result\Success', $results[$check]);
     }
 
-    public function testFilteringFailure()
+    public function testFilteringByGroupFailure()
     {
+        $this->setExpectedException('\RuntimeException');
+
         $this->config['diagnostics']['group1']['test11'] = $check11 = new AlwaysSuccessCheck();
         $this->config['diagnostics']['group2']['test21'] = $check21 = new AlwaysSuccessCheck();
         $this->config['diagnostics']['group2']['test22'] = $check22 = new AlwaysSuccessCheck();
         $this->routeMatch->setParam('filter', 'non-existent-group');
+        $this->controller->dispatch(new ConsoleRequest());
+    }
+
+    public function testFilteringByLabelNotMatch()
+    {
+        $this->config['diagnostics']['group1']['test11'] = $check11 = new AlwaysSuccessCheck();
+        $this->config['diagnostics']['group2']['test21'] = $check21 = new AlwaysSuccessCheck();
+        $this->config['diagnostics']['group2']['test22'] = $check22 = new AlwaysSuccessCheck();
+
+        $this->routeMatch->setParam('filter', 'group2');
+        $this->routeMatch->setParam('label', 'non-existent-label');
+
         $result = $this->controller->dispatch(new ConsoleRequest());
-        $this->assertInstanceOf('Zend\View\Model\ViewModel', $result);
-        $this->assertEquals(1, $result->getErrorLevel());
+
+        $results = $result->getVariable('results');
+        $this->assertEquals(0, $results->count());
+
+        $this->controller->dispatch(new ConsoleRequest());
     }
 
     public function testBreakOnFailure()

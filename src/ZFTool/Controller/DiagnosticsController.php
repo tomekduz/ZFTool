@@ -38,188 +38,22 @@ class DiagnosticsController extends AbstractActionController
 
     public function runAction()
     {
-        $sm = $this->getServiceLocator();
+        $serviceLocator = $this->getServiceLocator();
         /* @var $console AdapterInterface */
         /* @var $config array */
         /* @var $mm ModuleManager */
-        $console = $sm->get('console');
-        $config = $sm->get('Configuration');
-        $mm = $sm->get('ModuleManager');
+        $console = $serviceLocator->get('console');
 
         $verbose        = $this->params()->fromRoute('verbose', false);
         $debug          = $this->params()->fromRoute('debug', false);
         $quiet          = !$verbose && !$debug && $this->params()->fromRoute('quiet', false);
         $breakOnFailure = $this->params()->fromRoute('break', false);
-        $checkGroupName = $this->params()->fromRoute('filter', false);
-        $checkLabelName     = $this->params()->fromRoute('label', false);
+        $filterGroupName = $this->params()->fromRoute('filter', false);
+        $filterLabelName = $this->params()->fromRoute('label', false);
 
-        // Get basic diag configuration
-        $config = isset($config['diagnostics']) ? $config['diagnostics'] : array();
+        $config = $this->getCheckConfigs($filterGroupName, $filterLabelName);
 
-        // Collect diag tests from modules
-        $modules = $mm->getLoadedModules(false);
-        foreach ($modules as $moduleName => $module) {
-            if (is_callable(array($module, 'getDiagnostics'))) {
-                $checks = $module->getDiagnostics();
-                if (is_array($checks)) {
-                    $config[$moduleName] = $checks;
-                }
-
-                // Exit the loop early if we found check definitions for
-                // the only check group that we want to run.
-                if ($checkGroupName && $moduleName == $checkGroupName) {
-                    break;
-                }
-            }
-        }
-
-        // Filter array if a check group name has been provided
-        if ($checkGroupName) {
-            $config = array_intersect_ukey($config, array($checkGroupName => 1), 'strcasecmp');
-
-            if (empty($config)) {
-                throw new RuntimeException(sprintf(
-                    "Unable to find a group of diagnostic checks called \"%s\". Try to use module name (i.e. \"%s\").\n",
-                    $checkGroupName,
-                    'Application'
-                ));
-            }
-
-            if ($checkLabelName) {
-                $config[$checkGroupName] = array_diff_ukey($config[$checkGroupName], array($checkLabelName => 1), 'strcasecmp');
-            }
-
-        }
-
-        // Check if there are any diagnostic checks defined
-        if (empty($config)) {
-            if (empty($config)) {
-                throw new RuntimeException(
-                    "There are no diagnostic checks currently enabled for this application - please add one or more " .
-                    "entries into config \"diagnostics\" array or add getDiagnostics() method to your Module class. " .
-                    "\n\nMore info: https://github.com/zendframework/ZFTool/blob/master/docs/" .
-                    "DIAGNOSTICS.md#adding-checks-to-your-module\n"
-                );
-            }
-        }
-
-        // Analyze check definitions and construct check instances
-        $checkCollection = array();
-        foreach ($config as $checkGroupName => $checks) {
-            foreach ($checks as $checkLabel => $check) {
-                // Do not use numeric labels.
-                if (!$checkLabel || is_numeric($checkLabel)) {
-                    $checkLabel = false;
-                }
-
-                // Handle a callable.
-                if (is_callable($check)) {
-                    $check = new Callback($check);
-                    if ($checkLabel) {
-                        $check->setLabel($checkGroupName . ': ' . $checkLabel);
-                    }
-
-                    $checkCollection[] = $check;
-                    continue;
-                }
-
-                // Handle check object instance.
-                if (is_object($check)) {
-                    if (!$check instanceof CheckInterface) {
-                        throw new RuntimeException(
-                            'Cannot use object of class "' . get_class($check). '" as check. '.
-                            'Expected instance of ZendDiagnostics\Check\CheckInterface'
-                        );
-                    }
-
-                    // Use duck-typing for determining if the check allows for setting custom label
-                    if ($checkLabel && is_callable(array($check, 'setLabel'))) {
-                        $check->setLabel($checkGroupName . ': ' . $checkLabel);
-                    }
-
-
-                    if ($checkLabelName && $check->getLabel() !== $checkLabelName) {
-                        continue;
-                    }
-
-                    $checkCollection[] = $check;
-                    continue;
-                }
-
-                // Handle an array containing callback or identifier with optional parameters.
-                if (is_array($check)) {
-                    if (!count($check)) {
-                        throw new RuntimeException(
-                            'Cannot use an empty array() as check definition in "'.$checkGroupName.'"'
-                        );
-                    }
-
-                    // extract check identifier and store the remainder of array as parameters
-                    $testName = array_shift($check);
-                    $params = $check;
-                } elseif (is_scalar($check)) {
-                    $testName = $check;
-                    $params = array();
-                } else {
-                    throw new RuntimeException(
-                        'Cannot understand diagnostic check definition "' . gettype($check). '" in "'.$checkGroupName.'"'
-                    );
-                }
-
-                // Try to expand check identifier using Service Locator
-                if (is_string($testName) && $sm->has($testName)) {
-                    $check = $sm->get($testName);
-
-                // Try to use the ZendDiagnostics namespace
-                } elseif (is_string($testName) && class_exists('ZendDiagnostics\\Check\\' . $testName)) {
-                    $class = new \ReflectionClass('ZendDiagnostics\\Check\\' . $testName);
-                    $check = $class->newInstanceArgs($params);
-
-                // Try to use the ZFTool namespace
-                } elseif (is_string($testName) && class_exists('ZFTool\\Diagnostics\\Check\\' . $testName)) {
-                    $class = new \ReflectionClass('ZFTool\\Diagnostics\\Check\\' . $testName);
-                    $check = $class->newInstanceArgs($params);
-
-                // Check if provided with a callable inside an array
-                } elseif (is_callable($testName)) {
-                    $check = new Callback($testName, $params);
-                    if ($checkLabel) {
-                        $check->setLabel($checkGroupName . ': ' . $checkLabel);
-                    }
-
-                    $checkCollection[] = $check;
-                    continue;
-
-                // Try to expand check using class name
-                } elseif (is_string($testName) && class_exists($testName)) {
-                    $class = new \ReflectionClass($testName);
-                    $check = $class->newInstanceArgs($params);
-                } else {
-                    throw new RuntimeException(
-                        'Cannot find check class or service with the name of "' . $testName . '" ('.$checkGroupName.')'
-                    );
-                }
-
-                if (!$check instanceof CheckInterface) {
-                    // not a real check
-                    throw new RuntimeException(
-                        'The check object of class '.get_class($check).' does not implement '.
-                        'ZendDiagnostics\Check\CheckInterface'
-                    );
-                }
-
-                // Use duck-typing for determining if the check allows for setting custom label
-                if ($checkLabel && is_callable(array($check, 'setLabel'))) {
-                    $check->setLabel($checkGroupName . ': ' . $checkLabel);
-                }
-
-                if ($checkLabelName && $check->getLabel() !== $checkLabelName) {
-                    continue;
-                }
-
-                $checkCollection[] = $check;
-            }
-        }
+        $checkCollection = $this->getCheckCollection($config, $filterLabelName);
 
         // Configure check runner
         $runner = new Runner();
@@ -247,6 +81,189 @@ class DiagnosticsController extends AbstractActionController
         if ($request instanceof Request) {
             return $this->processHttpRequest($request, $results);
         }
+    }
+
+    protected function getCheckConfigs($filterGroupName = false, $filterLabelName = false)
+    {
+        $serviceLocator = $this->getServiceLocator();
+
+        $config = $serviceLocator->get('Configuration');
+        $moduleManager = $serviceLocator->get('ModuleManager');
+
+        // Get basic diag configuration
+        $config = isset($config['diagnostics']) ? $config['diagnostics'] : array();
+
+        // Collect diag tests from modules
+        $modules = $moduleManager->getLoadedModules(false);
+        foreach ($modules as $moduleName => $module) {
+            if (is_callable(array($module, 'getDiagnostics'))) {
+                $checks = $module->getDiagnostics();
+                if (is_array($checks)) {
+                    $config[$moduleName] = $checks;
+                }
+
+                // Exit the loop early if we found check definitions for
+                // the only check group that we want to run.
+                if ($filterGroupName && $moduleName == $filterGroupName) {
+                    break;
+                }
+            }
+        }
+
+        // Filter array if a check group name has been provided
+        if ($filterGroupName) {
+            $config = array_intersect_ukey($config, array($filterGroupName => 1), 'strcasecmp');
+
+            if (empty($config)) {
+                throw new RuntimeException(sprintf(
+                    "Unable to find a group of diagnostic checks called \"%s\". Try to use module name (i.e. \"%s\").\n",
+                    $filterGroupName,
+                    'Application'
+                ));
+            }
+
+            if ($filterLabelName) {
+                $config[$filterGroupName] = array_diff_ukey($config[$filterGroupName], array($filterLabelName => 1), 'strcasecmp');
+            }
+
+        }
+
+        // Check if there are any diagnostic checks defined
+        if (empty($config)) {
+            throw new RuntimeException(
+                "There are no diagnostic checks currently enabled for this application - please add one or more " .
+                "entries into config \"diagnostics\" array or add getDiagnostics() method to your Module class. " .
+                "\n\nMore info: https://github.com/zendframework/ZFTool/blob/master/docs/" .
+                "DIAGNOSTICS.md#adding-checks-to-your-module\n"
+            );
+        }
+
+        return $config;
+    }
+
+    protected function getCheckCollection(array $config, $filterLabelName)
+    {
+        $checkCollection = array();
+
+        foreach ($config as $checkGroupName => $checks) {
+            foreach ($checks as $checkLabel => $check) {
+                // Do not use numeric labels.
+
+                $check = $this->getCheckInstance($checkGroupName, $checkLabel, $check);
+
+                if ($filterLabelName && $check->getLabel() !== $filterLabelName) {
+                    continue;
+                }
+
+                $checkCollection[] = $check;
+            }
+        }
+
+        return $checkCollection;
+    }
+
+    protected function getCheckInstance($checkGroupName, $checkLabel, $check)
+    {
+        $serviceLocator = $this->getServiceLocator();
+
+        if (!$checkLabel || is_numeric($checkLabel)) {
+            $checkLabel = false;
+        }
+
+        // Handle a callable.
+        if (is_callable($check)) {
+            $check = new Callback($check);
+            if ($checkLabel) {
+                $check->setLabel($checkGroupName . ': ' . $checkLabel);
+            }
+
+            return $check;
+        }
+
+        // Handle check object instance.
+        if (is_object($check)) {
+            if (!$check instanceof CheckInterface) {
+                throw new RuntimeException(
+                    'Cannot use object of class "' . get_class($check). '" as check. '.
+                    'Expected instance of ZendDiagnostics\Check\CheckInterface'
+                );
+            }
+
+            // Use duck-typing for determining if the check allows for setting custom label
+            if ($checkLabel && is_callable(array($check, 'setLabel'))) {
+                $check->setLabel($checkGroupName . ': ' . $checkLabel);
+            }
+
+            return $check;
+        }
+
+        // Handle an array containing callback or identifier with optional parameters.
+        if (is_array($check)) {
+            if (!count($check)) {
+                throw new RuntimeException(
+                    'Cannot use an empty array() as check definition in "'.$checkGroupName.'"'
+                );
+            }
+
+            // extract check identifier and store the remainder of array as parameters
+            $testName = array_shift($check);
+            $params = $check;
+        } elseif (is_scalar($check)) {
+            $testName = $check;
+            $params = array();
+        } else {
+            throw new RuntimeException(
+                'Cannot understand diagnostic check definition "' . gettype($check). '" in "'.$checkGroupName.'"'
+            );
+        }
+
+        // Try to expand check identifier using Service Locator
+        if (is_string($testName) && $serviceLocator->has($testName)) {
+            $check = $serviceLocator->get($testName);
+
+            // Try to use the ZendDiagnostics namespace
+        } elseif (is_string($testName) && class_exists('ZendDiagnostics\\Check\\' . $testName)) {
+            $class = new \ReflectionClass('ZendDiagnostics\\Check\\' . $testName);
+            $check = $class->newInstanceArgs($params);
+
+            // Try to use the ZFTool namespace
+        } elseif (is_string($testName) && class_exists('ZFTool\\Diagnostics\\Check\\' . $testName)) {
+            $class = new \ReflectionClass('ZFTool\\Diagnostics\\Check\\' . $testName);
+            $check = $class->newInstanceArgs($params);
+
+            // Check if provided with a callable inside an array
+        } elseif (is_callable($testName)) {
+            $check = new Callback($testName, $params);
+            if ($checkLabel) {
+                $check->setLabel($checkGroupName . ': ' . $checkLabel);
+            }
+
+            return $check;
+
+            // Try to expand check using class name
+        } elseif (is_string($testName) && class_exists($testName)) {
+            $class = new \ReflectionClass($testName);
+            $check = $class->newInstanceArgs($params);
+        } else {
+            throw new RuntimeException(
+                'Cannot find check class or service with the name of "' . $testName . '" ('.$checkGroupName.')'
+            );
+        }
+
+        if (!$check instanceof CheckInterface) {
+            // not a real check
+            throw new RuntimeException(
+                'The check object of class '.get_class($check).' does not implement '.
+                'ZendDiagnostics\Check\CheckInterface'
+            );
+        }
+
+        // Use duck-typing for determining if the check allows for setting custom label
+        if ($checkLabel && is_callable(array($check, 'setLabel'))) {
+            $check->setLabel($checkGroupName . ': ' . $checkLabel);
+        }
+
+        return $check;
     }
 
     private function processConsoleRequest(Collection $results)
