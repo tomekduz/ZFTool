@@ -60,7 +60,9 @@ class DiagnosticsController extends AbstractActionController
         $runner->addChecks($checkCollection);
         $runner->getConfig()->setBreakOnFailure($breakOnFailure);
 
-        if (!$quiet && $this->getRequest() instanceof ConsoleRequest) {
+        $request = $this->getRequest();
+
+        if (!$quiet && $request instanceof ConsoleRequest) {
             if ($verbose || $debug) {
                 $runner->addReporter(new VerboseConsole($console, $debug));
             } else {
@@ -71,16 +73,11 @@ class DiagnosticsController extends AbstractActionController
         // Run tests
         $results = $runner->run();
 
-        $request = $this->getRequest();
-
         // Return result
         if ($request instanceof ConsoleRequest) {
             return $this->processConsoleRequest($results);
         }
-
-        if ($request instanceof Request) {
-            return $this->processHttpRequest($request, $results);
-        }
+        return $this->processHttpRequest($request, $results);
     }
 
     protected function getCheckConfigs($filterGroupName = false, $filterLabelName = false)
