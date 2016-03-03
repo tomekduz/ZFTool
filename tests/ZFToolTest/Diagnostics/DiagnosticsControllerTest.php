@@ -67,10 +67,10 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
         $this->sm = new ServiceManager();
         $this->sm->setService('console', new ConsoleAdapter());
         $this->sm->setService('config', $this->config);
-        $this->sm->setAlias('configuration', 'config');
+        $this->sm->setAlias('Configuration', 'config');
 
         $this->mm = new InjectableModuleManager();
-        $this->sm->setService('modulemanager', $this->mm);
+        $this->sm->setService('ModuleManager', $this->mm);
 
         $event = new MvcEvent();
         $this->routeMatch = new RouteMatch(array(
@@ -78,8 +78,7 @@ class DiagnosticsControllerTest extends \PHPUnit_Framework_TestCase
             'action'     => 'run'
         ));
         $event->setRouteMatch($this->routeMatch);
-        $this->controller = new DiagnosticsController();
-        $this->controller->setServiceLocator($this->sm);
+        $this->controller = new DiagnosticsController($this->sm);
         $this->controller->setEvent($event);
 
         // Top-level output buffering to prevent leaking info to the console

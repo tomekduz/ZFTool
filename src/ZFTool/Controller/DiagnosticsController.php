@@ -3,12 +3,12 @@
 namespace ZFTool\Controller;
 
 use Zend\Console\Adapter\AdapterInterface;
-use Zend\Console\ColorInterface;
 use Zend\Console\Request as ConsoleRequest;
 use Zend\Http\Header\Accept;
 use Zend\Http\Request;
 use Zend\ModuleManager\ModuleManager;
 use Zend\Mvc\Controller\AbstractActionController;
+use Zend\ServiceManager\ServiceLocatorInterface;
 use Zend\View\Model\ConsoleModel;
 use Zend\View\Model\JsonModel;
 use Zend\View\Model\ViewModel;
@@ -36,9 +36,16 @@ class DiagnosticsController extends AbstractActionController
     const RESULT_SKIP = 'skip';
     const RESULT_UNKNOWN = 'unknown';
 
+    protected $serviceLocator;
+
+    public function __construct(ServiceLocatorInterface $serviceLocator)
+    {
+        $this->serviceLocator = $serviceLocator;
+    }
+
     public function runAction()
     {
-        $serviceLocator = $this->getServiceLocator();
+        $serviceLocator = $this->serviceLocator;
         /* @var $console AdapterInterface */
         /* @var $config array */
         /* @var $mm ModuleManager */
@@ -82,7 +89,7 @@ class DiagnosticsController extends AbstractActionController
 
     protected function getCheckConfigs($filterGroupName = false, $filterLabelName = false)
     {
-        $serviceLocator = $this->getServiceLocator();
+        $serviceLocator = $this->serviceLocator;
 
         $config = $serviceLocator->get('Configuration');
         $moduleManager = $serviceLocator->get('ModuleManager');
@@ -161,7 +168,7 @@ class DiagnosticsController extends AbstractActionController
 
     protected function getCheckInstance($checkGroupName, $checkLabel, $check)
     {
-        $serviceLocator = $this->getServiceLocator();
+        $serviceLocator = $this->serviceLocator;
 
         if (!$checkLabel || is_numeric($checkLabel)) {
             $checkLabel = false;
