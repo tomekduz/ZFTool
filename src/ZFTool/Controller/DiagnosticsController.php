@@ -38,7 +38,7 @@ class DiagnosticsController extends AbstractActionController
 
     protected $serviceLocator;
 
-    public function __construct(ServiceLocatorInterface $serviceLocator)
+    public function __construct(ServiceLocatorInterface $serviceLocator = null)
     {
         $this->serviceLocator = $serviceLocator;
     }
