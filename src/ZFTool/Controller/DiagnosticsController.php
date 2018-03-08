@@ -20,6 +20,7 @@ use ZendDiagnostics\Result\ResultInterface;
 use ZendDiagnostics\Result\SkipInterface;
 use ZendDiagnostics\Result\SuccessInterface;
 use ZendDiagnostics\Result\WarningInterface;
+use ZFTool\Diagnostics\ConfigInterface;
 use ZFTool\Diagnostics\Exception\RuntimeException;
 use ZFTool\Diagnostics\Reporter\BasicConsole;
 use ZFTool\Diagnostics\Reporter\VerboseConsole;
@@ -63,9 +64,13 @@ class DiagnosticsController extends AbstractActionController
         $checkCollection = $this->getCheckCollection($config, $filterLabelName);
 
         // Configure check runner
-        $runner = $serviceLocator->has('ZFTool\Diagnostics\Runner') ? $serviceLocator->get('ZFTool\Diagnostics\Runner') : new Runner();
+        $runner = $serviceLocator->has('ZendDiagnostics\Runner\Runner') ? $serviceLocator->get('ZendDiagnostics\Runner\Runner') : new Runner();
         $runner->addChecks($checkCollection);
-        $runner->getConfig()->setBreakOnFailure($breakOnFailure);
+        $runnerConfig = $runner->getConfig();
+
+        if ($runnerConfig instanceof ConfigInterface) {
+            $runnerConfig->setBreakOnFailure($breakOnFailure);
+        }
 
         $request = $this->getRequest();
 
