@@ -63,7 +63,7 @@ class DiagnosticsController extends AbstractActionController
         $checkCollection = $this->getCheckCollection($config, $filterLabelName);
 
         // Configure check runner
-        $runner = new Runner();
+        $runner = $serviceLocator->has('ZFTool\Diagnostics\Runner') ? $serviceLocator->get('ZFTool\Diagnostics\Runner') : new Runner();
         $runner->addChecks($checkCollection);
         $runner->getConfig()->setBreakOnFailure($breakOnFailure);
 
