@@ -19,7 +19,7 @@
         }
     },
     "require": {
-        "php": ">=5.3.3",
+        "php": "^8.0",
         "zendframework/zenddiagnostics" : ">=1.0.0",
         "zendframework/zend-code": ">=2.2.2",
         "zendframework/zend-config": ">=2.2.2",
