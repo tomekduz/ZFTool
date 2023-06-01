@@ -19,29 +19,25 @@
         }
     },
     "require": {
-        "php": "^8.0",
-        "zendframework/zenddiagnostics" : ">=1.0.0",
-        "zendframework/zend-code": ">=2.2.2",
-        "zendframework/zend-config": ">=2.2.2",
-        "zendframework/zend-console": ">=2.2.2",
-        "zendframework/zend-file": ">=2.2.2",
-        "zendframework/zend-form": ">=2.2.2",
-        "zendframework/zend-i18n": ">=2.2.2",
-        "zendframework/zend-loader": ">=2.2.2",
-        "zendframework/zend-log": ">=2.2.2",
-        "zendframework/zend-modulemanager": ">=2.2.2",
-        "zendframework/zend-mvc": ">=2.2.2",
-        "zendframework/zend-serializer": ">=2.2.2",
-        "zendframework/zend-servicemanager": ">=2.2.2",
-        "zendframework/zend-stdlib": ">=2.2.2",
-        "zendframework/zend-text": ">=2.2.2",
-        "zendframework/zend-version": ">=2.2.2 ",
-        "zendframework/zend-view": ">=2.2.2",
-        "zendframework/zend-http": ">=2.2.2"
+        "php": ">=8",
+        "laminas/laminas-diagnostics": "^1.24",
+        "laminas/laminas-config": "^3.2",
+        "laminas/laminas-modulemanager": "^2.8",
+        "laminas/laminas-mvc": "^3.1 || ^4.0.x-dev",
+        "laminas/laminas-servicemanager": "^3.3",
+        "laminas/laminas-stdlib": "^3.2",
+        "laminas/laminas-view": "^2.10",
+        "laminas/laminas-http": "^2.8",
+        "laminas/laminas-validator": "^2.10",
+        "laminas/laminas-escaper": "^2.6",
+        "laminas/laminas-loader": "^2.6",
+        "laminas/laminas-eventmanager": "^3.2",
+        "laminas/laminas-router": "^3.2 || ^4.0",
+        "laminas/laminas-text": "^2.7",
+        "laminas/laminas-uri": "^2.6"
     },
     "require-dev": {
-        "fabpot/php-cs-fixer": "1.7.*",
-        "phpunit/phpunit": "4.*"
+        "phpunit/phpunit": "^9"
     },
     "bin": ["zf.php"]
 }
